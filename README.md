@@ -1,23 +1,16 @@
 # Vamp Elastic Stack
 
-Example Elastic stack used for minimal Vamp setup.
- 
-## Base image
-
-Defined in `base` directory. Includes:
+Example Elastic stack used for minimal Vamp setup including Logstash configuration for [VGA](https://github.com/magneticio/vamp-gateway-agent).
 
 - [Elasticsearch](https://www.elastic.co/products/elasticsearch) 2.2
 - [Logstash](https://www.elastic.co/products/logstash) 2.2
 - [Kibana](https://www.elastic.co/products/kibana) 4.4
 
-## Main image
+## Building
 
-Extends the base image with Logstash configuration for [VGA](https://github.com/magneticio/vamp-gateway-agent).
-
-## Building images 
-
-- build the base image, e.g. `docker build magneticio/elastic-base:2.2 base/.`
-- build the main image, e.g. `docker build magneticio/elastic:2.2 .`
+```
+docker build magneticio/elastic:2.2 .
+```
 
 ## Running 
 
