@@ -21,8 +21,14 @@ Extends the base image with Logstash configuration for [VGA](https://github.com/
 
 ## Running 
 
-`docker run --net=host magneticio/elastic:2.2`
+```
+docker run --net=host magneticio/elastic:2.2
+```
 
 In case of Docker 1.10.x or greater `seccomp` should be specified, otherwise:
 
-`docker run --privileged --net=host magneticio/elastic:2.2` or `docker run --security-opt=seccomp:unconfined --net=host magneticio/elastic:2.2`
+```
+docker run --privileged --net=host magneticio/elastic:2.2
+# or
+docker run --security-opt=seccomp:unconfined --net=host magneticio/elastic:2.2
+```
