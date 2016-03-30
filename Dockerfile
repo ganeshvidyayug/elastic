@@ -26,7 +26,7 @@ RUN set -ex && \
     echo "deb $ELASTICSEARCH_REPO_BASE stable main" > /etc/apt/sources.list.d/elasticsearch.list && \
     echo "deb $LOGSTASH_REPO_BASE stable main" > /etc/apt/sources.list.d/logstash.list && \
 	  apt-get update && \
-		apt-get install -y --no-install-recommends supervisor elasticsearch=$ELASTICSEARCH_VERSION logstash=$LOGSTASH_VERSION && \
+		apt-get install -y --no-install-recommends elasticsearch=$ELASTICSEARCH_VERSION logstash=$LOGSTASH_VERSION && \
 	  for path in \
 		  /usr/share/elasticsearch/data \
 		  /usr/share/elasticsearch/logs \
@@ -55,11 +55,10 @@ ENV PATH /usr/share/elasticsearch/bin:/usr/share/logstash/bin:/usr/share/kibana/
 ADD elasticsearch.yml logging.yml /usr/share/elasticsearch/config/
 ADD logstash.conf /etc/logstash/conf.d/logstash.conf
 ADD kibana.yml /usr/share/kibana/config/kibana.yml
-ADD kibana.sh /usr/share/kibana/bin/kibana-start
+ADD entrypoint.sh kibana.sh logstash.sh /
 
 EXPOSE 9200 9300
 EXPOSE 5601
 EXPOSE 10001
 
-ADD supervisord.conf /etc/supervisor/supervisord.conf
-CMD ["supervisord", "-n", "-c", "/etc/supervisor/supervisord.conf"]
+ENTRYPOINT ["/entrypoint.sh"]
