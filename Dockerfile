@@ -62,3 +62,4 @@ EXPOSE 5601
 EXPOSE 10001
 
 ENTRYPOINT ["/entrypoint.sh"]
+CMD ["elasticsearch"]
