@@ -9,10 +9,10 @@ Example Elastic stack used for minimal Vamp setup including Logstash configurati
 ## Building
 
 ```
-docker build magneticio/elastic:2.2 .
+docker build --tag magneticio/elastic:2.2 .
 ```
 
-## Running 
+## Running
 
 ```
 docker run --net=host magneticio/elastic:2.2
