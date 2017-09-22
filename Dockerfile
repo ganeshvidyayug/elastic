@@ -1,65 +1,98 @@
 FROM java:openjdk-8-jre
 
-ENV ELASTICSEARCH_MAJOR 2.2
-ENV ELASTICSEARCH_VERSION 2.2.0
-ENV ELASTICSEARCH_REPO_BASE http://packages.elasticsearch.org/elasticsearch/2.x/debian
+ENV ELASTICSEARCH_VERSION 5.5.2
+ENV ELASTICSEARCH_DEB_VERSION 5.5.2
 
-ENV LOGSTASH_MAJOR 2.2
-ENV LOGSTASH_VERSION 1:2.2.0-1
-ENV LOGSTASH_REPO_BASE http://packages.elasticsearch.org/logstash/${LOGSTASH_MAJOR}/debian
+ENV GOSU_VERSION 1.10
 
-ENV KIBANA_VERSION 4.4.0
-ENV KIBANA_SHA1 82fa06e11942e13bba518655c1d34752ca259bab
+ENV KIBANA_VERSION 5.5.2
+
+ENV LANG en_US.UTF-8
+ENV LANGUAGE en_US:en
+ENV LC_ALL en_US.UTF-8
+
+# Elasticsearch and Kibana
 
 RUN set -ex && \
+    \
     groupadd -r elasticsearch && useradd -r -m -g elasticsearch elasticsearch && \
-    groupadd -r logstash && useradd -r -m -g logstash logstash && \
-    groupadd -r kibana && useradd -r -m -g kibana kibana && \
-		gpg --keyserver ha.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 && \
-    arch="$(dpkg --print-architecture)" && \
-	  curl -o /usr/local/bin/gosu -fSL "https://github.com/tianon/gosu/releases/download/1.3/gosu-$arch" && \
-	  curl -o /usr/local/bin/gosu.asc -fSL "https://github.com/tianon/gosu/releases/download/1.3/gosu-$arch.asc" && \
-	  gpg --verify /usr/local/bin/gosu.asc && \
-	  rm /usr/local/bin/gosu.asc && \
-	  chmod +x /usr/local/bin/gosu && \
-		apt-key adv --keyserver ha.pool.sks-keyservers.net --recv-keys 46095ACC8548582C1A2699A9D27D666CD88E42B4 && \
-    echo "deb $ELASTICSEARCH_REPO_BASE stable main" > /etc/apt/sources.list.d/elasticsearch.list && \
-    echo "deb $LOGSTASH_REPO_BASE stable main" > /etc/apt/sources.list.d/logstash.list && \
-	  apt-get update && \
-		apt-get install -y --no-install-recommends elasticsearch=$ELASTICSEARCH_VERSION logstash=$LOGSTASH_VERSION && \
-	  for path in \
-		  /usr/share/elasticsearch/data \
-		  /usr/share/elasticsearch/logs \
-		  /usr/share/elasticsearch/config \
-		  /usr/share/elasticsearch/config/scripts \
-	  ; do \
-		  mkdir -p "$path"; \
-		  chown -R elasticsearch:elasticsearch "$path"; \
-	  done && \
-	  mv /opt/logstash /usr/share/ && \
-		curl -fSL "https://download.elastic.co/kibana/kibana/kibana-${KIBANA_VERSION}-linux-x64.tar.gz" -o kibana.tar.gz && \
-	  echo "${KIBANA_SHA1} kibana.tar.gz" | sha1sum -c - && \
-	  mkdir -p /usr/share/kibana && \
-	  tar -xz --strip-components=1 -C /usr/share/kibana -f kibana.tar.gz && \
-	  chown -R kibana:kibana /usr/share/kibana && \
-	  rm kibana.tar.gz && \
-	  /usr/share/kibana/bin/kibana plugin --install elastic/sense && \
-	  chown -R elasticsearch:elasticsearch /usr/share/elasticsearch && \
-	  chown -R logstash:logstash /usr/share/logstash && \
-	  chown -R kibana:kibana /usr/share/kibana && \
-	  mkdir -p /opt/vamp && \
-	  apt-get clean && apt-get autoremove -y && rm -rf /var/lib/apt/lists/*
+    groupadd -r kibana && useradd -r -m -g kibana kibana
 
-ENV PATH /usr/share/elasticsearch/bin:/usr/share/logstash/bin:/usr/share/kibana/bin:$PATH
+# grab gosu for easy step-down from root
+RUN set -x \
+	&& wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture)" \
+	&& wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$(dpkg --print-architecture).asc" \
+	&& export GNUPGHOME="$(mktemp -d)" \
+	&& gpg --keyserver ha.pool.sks-keyservers.net --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4 \
+	&& gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu \
+	&& rm -rf "$GNUPGHOME" /usr/local/bin/gosu.asc \
+	&& chmod +x /usr/local/bin/gosu \
+	&& gosu nobody true
 
-ADD elasticsearch.yml logging.yml /usr/share/elasticsearch/config/
-ADD logstash.conf /etc/logstash/conf.d/logstash.conf
-ADD kibana.yml /usr/share/kibana/config/kibana.yml
-ADD entrypoint.sh kibana.sh logstash.sh /
+# KEYS
+RUN set -ex; \
+# https://artifacts.elastic.co/GPG-KEY-elasticsearch
+	key='46095ACC8548582C1A2699A9D27D666CD88E42B4'; \
+	export GNUPGHOME="$(mktemp -d)"; \
+	gpg --keyserver ha.pool.sks-keyservers.net --recv-keys "$key"; \
+	gpg --export "$key" > /etc/apt/trusted.gpg.d/elastic.gpg; \
+	rm -rf "$GNUPGHOME"; \
+	apt-key list
+
+# ELASTICSEACH
+RUN set -x \
+	&& apt-get update && apt-get install -y --no-install-recommends apt-transport-https && rm -rf /var/lib/apt/lists/* \
+	&& echo 'deb https://artifacts.elastic.co/packages/5.x/apt stable main' > /etc/apt/sources.list.d/elasticsearch.list
+
+RUN set -x \
+	\
+# don't allow the package to install its sysctl file (causes the install to fail)
+# Failed to write '262144' to '/proc/sys/vm/max_map_count': Read-only file system
+	&& dpkg-divert --rename /usr/lib/sysctl.d/elasticsearch.conf \
+	\
+	&& apt-get update \
+	&& apt-get install -y --no-install-recommends "elasticsearch=$ELASTICSEARCH_DEB_VERSION" \
+	&& rm -rf /var/lib/apt/lists/*
+
+RUN for path in \
+    		  /usr/share/elasticsearch/data \
+    		  /usr/share/elasticsearch/logs \
+    		  /usr/share/elasticsearch/config \
+    		  /usr/share/elasticsearch/config/scripts \
+    	  ; do \
+    		  mkdir -p "$path"; \
+    		  chown -R elasticsearch:elasticsearch "$path"; \
+    done && \
+    chown -R elasticsearch:elasticsearch /usr/share/elasticsearch
+
+
+#  Kibana
+# https://www.elastic.co/guide/en/kibana/5.0/deb.htmls
+RUN set -x \
+	&& apt-get update \
+	&& apt-get install -y --no-install-recommends kibana=$KIBANA_VERSION \
+	&& rm -rf /var/lib/apt/lists/* \
+	\
+# the default "server.host" is "localhost" in 5+
+	&& sed -ri "s!^(\#\s*)?(server\.host:).*!\2 '0.0.0.0'!" /etc/kibana/kibana.yml \
+	&& grep -q "^server\.host: '0.0.0.0'\$" /etc/kibana/kibana.yml \
+	\
+# ensure the default configuration is useful when using --link
+	&& sed -ri "s!^(\#\s*)?(elasticsearch\.url:).*!\2 'http://elasticsearch:9200'!" /etc/kibana/kibana.yml \
+	&& grep -q "^elasticsearch\.url: 'http://elasticsearch:9200'\$" /etc/kibana/kibana.yml
+
+
+
+ENV PATH /usr/share/elasticsearch/bin:$PATH
+ENV PATH /usr/share/kibana/bin:$PATH
+
+
+COPY elasticsearch.yml log4j2.properties /usr/share/elasticsearch/config/
+COPY kibana.yml /usr/share/kibana/config/kibana.yml
+COPY entrypoint.sh kibana.sh /
 
 EXPOSE 9200 9300
 EXPOSE 5601
-EXPOSE 10001
 
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["elasticsearch"]

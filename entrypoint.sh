@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 
-/logstash.sh &
 /kibana.sh &
 
 set -e
