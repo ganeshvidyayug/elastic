@@ -1,6 +1,6 @@
 # Vamp Elastic Stack
 
-Example Elastic stack used for minimal Vamp setup including Logstash configuration for [VGA](https://github.com/magneticio/vamp-gateway-agent).
+Example Elastic stack used for minimal Vamp setup.
 
 - [Elasticsearch](https://www.elastic.co/products/elasticsearch) 5.5.2
 - [Kibana](https://www.elastic.co/products/kibana) 5.5.2
